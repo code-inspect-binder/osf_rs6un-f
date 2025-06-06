@@ -1,0 +1,675 @@
+---
+title: "Simulation results predictive performance multilevel VAR(1) model with random effects"
+authors: "Ginette Lafit"
+date: 23-02-2021
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Initial set up
+
+
+```{r definition, echo = TRUE}
+ls()
+
+rm(list=ls())
+
+library(ggplot2)
+library(gridExtra)
+library(sjstats)
+library(dplyr)
+library(knitr)
+library(rstatix)
+library(lme4)
+
+######################################################################################
+######################################################################################
+######################################################################################
+
+# Upload the functions
+source(file="Performance.VAR.MSPE.Anova.R")
+source(file="Performance.VAR.R2.Anova.R")
+
+######################################################################################
+######################################################################################
+######################################################################################
+
+# Set the values to simulate data assuming a VAR(1) process
+set.seed(123) # Set random seed
+N = c(20,60,120) # Number of participants
+T = c(50,100,200) # Number of time points
+P = c(2,4,8) # Number of variables in VAR(1) models
+
+Model.names = c('MAR.FE','MAR.RE','MVAR.FE','MVAR.RE','AR','VAR')
+
+# Set the number of replicates
+R = 100 # Number of replicates
+```
+
+
+### Repeated Measurement Anova
+
+#### MSPE
+
+```{r}
+#RM.Anova.MSPE = Performance.VAR.MSPE.Anova(N,T,P,R)
+#save(RM.Anova.MSPE, file = 'Results_Performance_MSPE_MVAR_RE.RData')
+
+load(file = 'Results_Performance_MSPE_MVAR_RE.RData')
+
+# Convert id and time into factor variables
+RM.Anova.MSPE <- RM.Anova.MSPE %>%
+  convert_as_factor(Time,Persons,Variables,Model,id)
+
+RM.Anova.MSPE$id.dat = as.numeric(interaction(RM.Anova.MSPE$Time,RM.Anova.MSPE$Variables,
+                                    RM.Anova.MSPE$Persons,RM.Anova.MSPE$id))
+
+# MSPE: Mixed ANOVA 
+
+fit.MSPE = aov(
+  MSPE ~ Time*Persons*Variables*Model + Error(id.dat/Model),
+  data = RM.Anova.MSPE
+)
+
+# Summary repeated measurement Anova
+summary.anova.MSPE = summary(fit.MSPE)
+summary.anova.MSPE
+
+# Eta squared
+eta.MSPE = effectsize::eta_squared(fit.MSPE,ci = 0.95)
+eta.MSPE
+
+# Compute main effects
+
+Model.effect <- RM.Anova.MSPE %>%
+  group_by(Model) %>%
+  anova_test(dv = MSPE, wid = id.dat, between = c(Time,Persons,Variables))
+Model.effect
+
+# Fit pairwise comparisons
+pwc <- RM.Anova.MSPE %>%
+  group_by(Time, Persons, Variables) %>%
+  pairwise_t_test(MSPE ~ Model, p.adjust.method = "bonferroni") %>%
+  select(-p, -p.signif) # Remove details
+pwc
+```
+
+#### R2
+
+```{r}
+#RM.Anova.R2 = Performance.VAR.R2.Anova(N,T,P,R)
+#save(RM.Anova.R2, file = 'Results_Performance_R2_MVAR_RE.RData')
+
+load(file = 'Results_Performance_R2_MVAR_RE.RData')
+
+# Convert id and time into factor variables
+RM.Anova.R2 <- RM.Anova.R2 %>%
+  convert_as_factor(Time,Persons,Variables,Model,id)
+
+RM.Anova.R2$id.dat = as.numeric(interaction(RM.Anova.R2$Time,RM.Anova.R2$Variables,
+                                    RM.Anova.R2$Persons,RM.Anova.R2$id))
+
+# Mixed ANOVA 
+
+fit.R2 = aov(
+  R2 ~ Time*Persons*Variables*Model + Error(id.dat/Model),
+  data = RM.Anova.R2
+)
+
+# Summary repeated measurement Anova
+summary.anova.R2 = summary(fit.R2)
+summary.anova.R2
+
+# Eta squared
+eta.R2 = effectsize::eta_squared(fit.R2,ci = 0.95)
+eta.R2
+
+# Compute main effects
+
+Model.effect <- RM.Anova.R2 %>%
+  group_by(Model) %>%
+  anova_test(dv = R2, wid = id.dat, between = c(Time,Persons,Variables))
+Model.effect
+
+# Fit pairwise comparisons
+pwc <- RM.Anova.R2 %>%
+  group_by(Time, Persons, Variables) %>%
+  pairwise_t_test(R2 ~ Model, p.adjust.method = "bonferroni") %>%
+  select(-p, -p.signif) # Remove details
+pwc
+
+```
+
+
+### Boxplot interaction effects
+
+```{r}
+# Performance MSPE for MVAR and VAR
+Performance.MSPE.Mean.Model = RM.Anova.MSPE
+
+Performance.MSPE.Mean.Model = Performance.MSPE.Mean.Model[Performance.MSPE.Mean.Model$Model==c('MVAR.RE','VAR'),]
+
+Boxplot_MSPE_MVAR_RE_Time_Variables = ggplot(Performance.MSPE.Mean.Model, aes(x=interaction(Time,Variables), y=MSPE, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_brewer(palette = "Set1") + theme_bw() + facet_grid(~Model) +
+labs(x="Number of time points and variables") + theme(axis.text.x = element_text(angle = 90))
+Boxplot_MSPE_MVAR_RE_Time_Variables
+
+ggsave("Boxplot_MSPE_MVAR_RE_Time_Variables.png", width = 6, height = 4)
+
+```
+
+### $P=2$
+
+#### Performance measure: MSPE 
+
+```{r}
+Performance.MSPE.Mean.P2 = RM.Anova.MSPE
+
+# Performance MSPE
+Performance.MSPE.Mean.P2 = Performance.MSPE.Mean.P2[Performance.MSPE.Mean.P2$Variables==2,]
+```
+
+#### Mean and standard deviation
+
+##### Across the number of time points
+
+```{r}
+kable(Performance.MSPE.Mean.P2 %>% 
+  group_by(Model,Time) %>% 
+  summarize(mean.MSE = mean(MSPE),
+            sd.MSE = sd(MSPE)), digits = 3)
+```
+
+##### Across the number of persons
+
+```{r}
+kable(Performance.MSPE.Mean.P2 %>% 
+  group_by(Model,Persons) %>% 
+  summarize(mean.MSE = mean(MSPE),
+            sd.MSE = sd(MSPE)), digits = 3)
+```
+
+#### Boxplots
+
+##### Across the number of time points
+
+```{r}
+Boxplot_MSPE_MVAR_RE_P_2_Time = ggplot(Performance.MSPE.Mean.P2, aes(x=as.factor(Time), y=MSPE, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw() + 
+labs(y = "MSPE", x="Number of time points")
+Boxplot_MSPE_MVAR_RE_P_2_Time
+
+ggsave("Boxplot_MSPE_MVAR_RE_P_2_Time.png", width = 6, height = 4)
+
+```
+
+##### Across the number of persons
+
+```{r}
+Boxplot_MSPE_MVAR_RE_P_2_Persons = ggplot(Performance.MSPE.Mean.P2, aes(x=as.factor(Persons), y=MSPE, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw() +
+labs(y = "MSPE", x="Number of persons")
+Boxplot_MSPE_MVAR_RE_P_2_Persons
+
+ggsave("Boxplot_MSPE_MVAR_RE_P_2_Persons.png", width = 6, height = 4)
+
+```
+
+
+#### Performance measure: $R^2$
+
+```{r}
+Performance.R2.Mean.P2 = RM.Anova.R2
+
+# Performance MSPE
+Performance.R2.Mean.P2 = Performance.R2.Mean.P2[Performance.R2.Mean.P2$Variables==2,]
+```
+
+#### Mean and standard deviation
+
+##### Across the number of time points
+
+```{r}
+kable(Performance.R2.Mean.P2 %>% 
+  group_by(Model,Time) %>% 
+  summarize(mean = mean(R2),
+            sd = sd(R2)), digits = 3)
+```
+
+##### Across the number of persons
+
+```{r}
+kable(Performance.R2.Mean.P2 %>% 
+  group_by(Model,Persons) %>% 
+  summarize(mean = mean(R2),
+            sd = sd(R2)), digits = 3)
+```
+
+#### Boxplots
+
+##### Across the number of time points
+
+```{r}
+Boxplot_R2_MVAR_RE_P_2_Time = ggplot(Performance.R2.Mean.P2, aes(x=as.factor(Time), y=R2, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw() + 
+labs(y = "R2", x="Number of time points")
+Boxplot_R2_MVAR_RE_P_2_Time
+
+ggsave("Boxplot_R2_MVAR_RE_P_2_Time.png", width = 6, height = 4)
+```
+
+##### Across the number of persons
+
+```{r}
+Boxplot_R2_MVAR_RE_P_2_Persons = ggplot(Performance.R2.Mean.P2, aes(x=as.factor(Persons), y=R2, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw() +
+labs(y = "R2", x="Number of persons")
+Boxplot_R2_MVAR_RE_P_2_Persons
+
+ggsave("Boxplot_R2_MVAR_RE_P_2_Persons.png", width = 6, height = 4)
+```
+
+
+### $P=4$
+
+#### Performance measure: MSPE 
+
+```{r}
+Performance.MSPE.Mean.P4 = RM.Anova.MSPE
+
+# Performance MSPE
+Performance.MSPE.Mean.P4 = Performance.MSPE.Mean.P4[Performance.MSPE.Mean.P4$Variables==4,]
+```
+
+#### Mean and standard deviation
+
+##### Across the number of time points
+
+```{r}
+kable(Performance.MSPE.Mean.P4 %>% 
+  group_by(Model,Time) %>% 
+  summarize(mean.MSE = mean(MSPE),
+            sd.MSE = sd(MSPE)), digits = 3)
+```
+
+##### Across the number of persons
+
+```{r}
+kable(Performance.MSPE.Mean.P4 %>% 
+  group_by(Model,Persons) %>% 
+  summarize(mean.MSE = mean(MSPE),
+            sd.MSE = sd(MSPE)), digits = 3)
+```
+
+#### Boxplots
+
+##### Across the number of time points
+
+```{r}
+Boxplot_MSPE_MVAR_RE_P_4_Time = ggplot(Performance.MSPE.Mean.P4, aes(x=as.factor(Time), y=MSPE, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw() + 
+labs(y = "MSPE", x="Number of time points")
+Boxplot_MSPE_MVAR_RE_P_4_Time
+
+ggsave("Boxplot_MSPE_MVAR_RE_P_4_Time.png", width = 6, height = 4)
+
+```
+
+##### Across the number of persons
+
+```{r}
+Boxplot_MSPE_MVAR_RE_P_4_Persons = ggplot(Performance.MSPE.Mean.P4, aes(x=as.factor(Persons), y=MSPE, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw() +
+labs(y = "MSPE", x="Number of persons")
+Boxplot_MSPE_MVAR_RE_P_4_Persons
+
+```
+
+
+#### Performance measure: $R^2$
+
+```{r}
+Performance.R2.Mean.P4 = RM.Anova.R2
+
+# Performance MSPE
+Performance.R2.Mean.P4 = Performance.R2.Mean.P4[Performance.R2.Mean.P4$Variables==4,]
+```
+
+#### Mean and standard deviation
+
+##### Across the number of time points
+
+```{r}
+kable(Performance.R2.Mean.P4 %>% 
+  group_by(Model,Time) %>% 
+  summarize(mean = mean(R2),
+            sd = sd(R2)), digits = 3)
+```
+
+##### Across the number of persons
+
+```{r}
+kable(Performance.R2.Mean.P4 %>% 
+  group_by(Model,Persons) %>% 
+  summarize(mean = mean(R2),
+            sd = sd(R2)), digits = 3)
+```
+
+#### Boxplots
+
+##### Across the number of time points
+
+```{r}
+Boxplot_R2_MVAR_RE_P_4_Time = ggplot(Performance.R2.Mean.P2, aes(x=as.factor(Time), y=R2, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw() + 
+labs(y = "R2", x="Number of time points")
+Boxplot_R2_MVAR_RE_P_4_Time
+
+ggsave("Boxplot_R2_MVAR_RE_P_4_Time.png", width = 6, height = 4)
+```
+
+##### Across the number of persons
+
+```{r}
+Boxplot_R2_MVAR_RE_P_4_Persons = ggplot(Performance.R2.Mean.P4, aes(x=as.factor(Persons), y=R2, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw() +
+labs(y = "R2", x="Number of persons")
+Boxplot_R2_MVAR_RE_P_4_Persons
+
+ggsave("Boxplot_R2_MVAR_RE_P_4_Persons.png", width = 6, height = 4)
+```
+
+
+### $P=8$
+
+#### Performance measure: MSPE 
+
+```{r}
+Performance.MSPE.Mean.P8 = RM.Anova.MSPE
+
+# Performance MSPE
+Performance.MSPE.Mean.P8 = Performance.MSPE.Mean.P8[Performance.MSPE.Mean.P8$Variables==8,]
+```
+
+#### Mean and standard deviation
+
+##### Across the number of time points
+
+```{r}
+kable(Performance.MSPE.Mean.P8 %>% 
+  group_by(Model,Time) %>% 
+  summarize(mean.MSE = mean(MSPE),
+            sd.MSE = sd(MSPE)), digits = 3)
+```
+
+##### Across the number of persons
+
+```{r}
+kable(Performance.MSPE.Mean.P8 %>% 
+  group_by(Model,Persons) %>% 
+  summarize(mean.MSE = mean(MSPE),
+            sd.MSE = sd(MSPE)), digits = 3)
+```
+
+#### Boxplots
+
+##### Across the number of time points
+
+```{r}
+Boxplot_MSPE_MVAR_RE_P_8_Time = ggplot(Performance.MSPE.Mean.P8, aes(x=as.factor(Time), y=MSPE, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw() + 
+labs(y = "MSPE", x="Number of time points")
+Boxplot_MSPE_MVAR_RE_P_8_Time
+
+ggsave("Boxplot_MSPE_MVAR_RE_P_8_Time.png", width = 6, height = 4)
+
+```
+
+##### Across the number of persons
+
+```{r}
+Boxplot_MSPE_MVAR_RE_P_8_Persons = ggplot(Performance.MSPE.Mean.P8, aes(x=as.factor(Persons), y=MSPE, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw() +
+labs(y = "MSPE", x="Number of persons")
+Boxplot_MSPE_MVAR_RE_P_8_Persons
+
+ggsave("Boxplot_MSPE_MVAR_RE_P_8_Persons.png", width = 6, height = 4)
+
+```
+
+
+#### Performance measure: $R^2$
+
+```{r}
+Performance.R2.Mean.P8 = RM.Anova.R2
+
+# Performance MSPE
+Performance.R2.Mean.P8 = Performance.R2.Mean.P8[Performance.R2.Mean.P8$Variables==8,]
+```
+
+#### Mean and standard deviation
+
+##### Across the number of time points
+
+```{r}
+kable(Performance.R2.Mean.P8 %>% 
+  group_by(Model,Time) %>% 
+  summarize(mean = mean(R2),
+            sd = sd(R2)), digits = 3)
+```
+
+##### Across the number of persons
+
+```{r}
+kable(Performance.R2.Mean.P8 %>% 
+  group_by(Model,Persons) %>% 
+  summarize(mean = mean(R2),
+            sd = sd(R2)), digits = 3)
+```
+
+#### Boxplots
+
+##### Across the number of time points
+
+```{r}
+Boxplot_R2_MVAR_RE_P_8_Time = ggplot(Performance.R2.Mean.P8, aes(x=as.factor(Time), y=R2, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw() + 
+labs(y = "R2", x="Number of time points")
+Boxplot_R2_MVAR_RE_P_8_Time
+
+ggsave("Boxplot_R2_MVAR_RE_P_8_Time.png", width = 6, height = 4)
+```
+
+##### Across the number of persons
+
+```{r}
+Boxplot_R2_MVAR_RE_P_8_Persons = ggplot(Performance.R2.Mean.P8, aes(x=as.factor(Persons), y=R2, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw() +
+labs(y = "R2", x="Number of persons")
+Boxplot_R2_MVAR_RE_P_8_Persons
+
+ggsave("Boxplot_R2_MVAR_RE_P_8_Persons.png", width = 6, height = 4)
+```
+
+
+### Performance measures: MSPE
+
+#### Data set
+
+
+```{r}
+Performance.MSPE.Mean = RM.Anova.MSPE
+```
+
+
+#### Mean and standard deviation
+
+##### Across the number of variables
+
+```{r}
+kable(Performance.MSPE.Mean %>% 
+  group_by(Model,Variables) %>% 
+  summarize(mean.MSE = mean(MSPE),
+            sd.MSE = sd(MSPE)), digits = 3)
+```
+
+##### Across the number of time points
+
+```{r}
+kable(Performance.MSPE.Mean %>% 
+  group_by(Model,Time) %>% 
+  summarize(mean.MSE = mean(MSPE),
+            sd.MSE = sd(MSPE)), digits = 3)
+```
+
+##### Across the number of persons
+
+```{r}
+kable(Performance.MSPE.Mean %>% 
+  group_by(Model,Persons) %>% 
+  summarize(mean.MSE = mean(MSPE),
+            sd.MSE = sd(MSPE)), digits = 3)
+```
+
+#### Boxplots
+
+##### Across the number of variables
+
+```{r}
+Boxplot_MSPE_MVAR_RE_Variables = ggplot(Performance.MSPE.Mean, aes(x=as.factor(Variables), y=MSPE, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw()+ 
+labs(y = "MSPE", x="Number of variables")
+Boxplot_MSPE_MVAR_RE_Variables
+
+ggsave("Boxplot_MSPE_MVAR_RE_Variables.png", width = 6, height = 4)
+
+``` 
+
+##### Across the number of time points
+
+```{r}
+Boxplot_MSPE_MVAR_RE_Time = ggplot(Performance.MSPE.Mean, aes(x=as.factor(Time), y=MSPE, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw() + 
+labs(y = "MSPE",x="Number of time points")
+Boxplot_MSPE_MVAR_RE_Time
+
+ggsave("Boxplot_MSPE_MVAR_RE_Time.png", width = 6, height = 4)
+
+```
+
+##### Across the number of persons
+
+```{r}
+Boxplot_MSPE_MVAR_RE_Persons = ggplot(Performance.MSPE.Mean, aes(x=as.factor(Persons), y=MSPE, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw() +
+labs(y = "MSPE", x="Number of persons")
+Boxplot_MSPE_MVAR_RE_Persons
+
+ggsave("Boxplot_MSPE_MVAR_RE_Persons.png", width = 6, height = 4)
+
+```
+
+### Performance measures: R2
+
+#### Data set
+
+
+```{r}
+Performance.R2.Mean = RM.Anova.R2
+```
+
+
+#### Mean and standard deviation
+
+##### Across the number of variables
+
+```{r}
+kable(Performance.R2.Mean %>% 
+  group_by(Model,Variables) %>% 
+  summarize(mean = mean(R2),
+            sd = sd(R2)), digits = 3)
+```
+
+##### Across the number of time points
+
+```{r}
+kable(Performance.R2.Mean %>% 
+  group_by(Model,Time) %>% 
+  summarize(mean = mean(R2),
+            sd = sd(R2)), digits = 3)
+```
+
+##### Across the number of persons
+
+```{r}
+kable(Performance.R2.Mean %>% 
+  group_by(Model,Persons) %>% 
+  summarize(mean = mean(R2),
+            sd = sd(R2)), digits = 3)
+```
+
+#### Boxplots
+
+##### Across the number of variables
+
+```{r}
+Boxplot_R2_MVAR_RE_Variables = ggplot(Performance.R2.Mean, aes(x=as.factor(Variables), y=R2, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw() + 
+labs(x="Number of variables")
+Boxplot_R2_MVAR_RE_Variables
+
+ggsave("Boxplot_R2_MVAR_RE_Variables.png", width = 6, height = 4)
+```
+
+##### Across the number of time points
+
+```{r}
+Boxplot_R2_MVAR_RE_Time = ggplot(Performance.R2.Mean, aes(x=as.factor(Time), y=R2, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw() +
+labs(x="Number of time points")
+Boxplot_R2_MVAR_RE_Time
+
+ggsave("Boxplot_R2_MVAR_RE_Time.png", width = 6, height = 4)
+```
+
+##### Across the number of persons
+
+```{r}
+Boxplot_R2_MVAR_RE_Persons = ggplot(Performance.R2.Mean, aes(x=as.factor(Persons), y=R2, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw() +
+labs(x="Number of persons")
+Boxplot_R2_MVAR_RE_Persons
+
+ggsave("Boxplot_R2_MVAR_RE_Persons.png", width = 6, height = 4)
+```
+
+
+##### MEthod with the minimum MSE for each generated data set
+
+```{r}
+colMeans(table(Performance.MSPE.Mean %>% 
+  group_by(id.dat) %>% 
+  summarize(min.MSE = Model[which.min(MSPE)])))
+```
+
+##### MEthod with the minimum MSE using the standard error rule for each generated data set
+
+```{r}
+colMeans(table(Performance.MSPE.Mean %>% 
+  group_by(id.dat) %>% 
+  summarize(min.MSE = Model[which.min(MSPE.1se)])))
+```
+
+
+##### MEthod with the maximum R2 for each generated data set
+
+```{r}
+colMeans(table(Performance.R2.Mean %>% 
+  group_by(id.dat) %>% 
+  summarize(min.MSE = Model[which.max(R2)])))
+```

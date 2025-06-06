@@ -1,0 +1,487 @@
+---
+title: "Simulation results person-specific VAR(1) model with random effects"
+authors: "Ginette Lafit"
+date: 19-11-2020
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Initial set up
+
+
+```{r definition, echo = TRUE}
+ls()
+
+rm(list=ls())
+
+library(ggplot2)
+library(gridExtra)
+library(sjstats)
+library(dplyr)
+library(knitr)
+library(rstatix)
+library(tidyverse)
+
+######################################################################################
+######################################################################################
+######################################################################################
+
+# Upload the functions
+source(file="Performance.VAR.Psi.AR.MSE.list.R")
+source(file="Performance.VAR.Psi.CR.MSE.list.R")
+source(file="Performance.VAR.Psi.AR.95CR.list.R")
+source(file="Performance.VAR.Psi.CR.95CR.list.R")
+
+######################################################################################
+######################################################################################
+######################################################################################
+
+# Set the values to simulate data assuming a VAR(1) process
+set.seed(123) # Set random seed
+N = c(20,60,120) # Number of participants
+T = c(50,100,200) # Number of time points
+P = c(2,4,8) # Number of variables in VAR(1) models
+
+Model.names = c('MAR.FE','MAR.RE','MVAR.FE','MVAR.RE','AR','VAR')
+
+# Set the number of replicates
+R = 100 # Number of replicates
+
+```
+
+
+### Repeated Measurement Anova
+
+#### MSE for the autoregressive effects
+
+```{r}
+RM.Anova.MSE.Psi.AR = Performance.VAR.Psi.AR.MSE.list(N,T,P,R)
+save(RM.Anova.MSE.Psi.AR, file = 'Results_Performance_MSE_Psi_AR_PS_VAR.RData')
+
+load(file = 'Results_Performance_MSE_Psi_AR_PS_VAR.RData')
+
+# Convert id and time into factor variables
+RM.Anova.MSE.Psi.AR <- RM.Anova.MSE.Psi.AR %>%
+  convert_as_factor(Time,Persons,Variables,Model,id)
+
+RM.Anova.MSE.Psi.AR$id.dat = as.numeric(interaction(RM.Anova.MSE.Psi.AR$Time,RM.Anova.MSE.Psi.AR$Variables,
+                                    RM.Anova.MSE.Psi.AR$Persons,RM.Anova.MSE.Psi.AR$id))
+
+# MSE: Mixed ANOVA 
+
+fit.MSE.Psi.AR = aov(
+  MSE.Psi ~ Time*Persons*Variables*Model + Error(id.dat/Model),
+  data = RM.Anova.MSE.Psi.AR
+)
+
+# Summary repeated measurement Anova
+summary.anova.MSE.Psi.AR = summary(fit.MSE.Psi.AR)
+summary.anova.MSE.Psi.AR
+
+# Eta squared
+eta.MSE.Psi.AR = effectsize::eta_squared(fit.MSE.Psi.AR,ci = 0.95)
+eta.MSE.Psi.AR
+
+```
+
+#### MSE for the cross-regressive effects
+
+```{r}
+RM.Anova.MSE.Psi.CR = Performance.VAR.Psi.CR.MSE.list(N,T,P,R)
+save(RM.Anova.MSE.Psi.CR, file = 'Results_Performance_MSE_Psi_CR_PS_VAR.RData')
+
+load(file = 'Results_Performance_MSE_Psi_CR_PS_VAR.RData')
+
+# Convert id and time into factor variables
+RM.Anova.MSE.Psi.CR <- RM.Anova.MSE.Psi.CR %>%
+  convert_as_factor(Time,Persons,Variables,Model,id)
+
+RM.Anova.MSE.Psi.CR$id.dat = as.numeric(interaction(RM.Anova.MSE.Psi.CR$Time,RM.Anova.MSE.Psi.CR$Variables,
+                                    RM.Anova.MSE.Psi.CR$Persons,RM.Anova.MSE.Psi.CR$id))
+
+# MSE: Mixed ANOVA 
+
+fit.MSE.Psi.CR = aov(
+  MSE.Psi ~ Time*Persons*Variables*Model + Error(id.dat/Model),
+  data = RM.Anova.MSE.Psi.CR
+)
+
+# Summary repeated measurement Anova
+summary.anova.MSE.Psi.CR = summary(fit.MSE.Psi.CR)
+summary.anova.MSE.Psi.CR
+
+# Eta squared
+eta.MSE.Psi.CR = effectsize::eta_squared(fit.MSE.Psi.CR,ci = 0.95)
+eta.MSE.Psi.CR
+
+```
+
+#### 95% Coverage Rate for the autoregressive effect
+
+```{r}
+#RM.Anova.95CR.Psi.AR = Performance.VAR.Psi.AR.95CR.list(N,T,P,R)
+#save(RM.Anova.95CR.Psi.AR, file = 'Results_Performance_95CR_Psi_AR_PS_VAR.RData')
+
+load(file = 'Results_Performance_95CR_Psi_AR_PS_VAR.RData')
+
+# Convert id and time into factor variables
+RM.Anova.95CR.Psi.AR <- RM.Anova.95CR.Psi.AR %>%
+  convert_as_factor(Time,Persons,Variables,Model,id)
+
+RM.Anova.95CR.Psi.AR$id.dat = as.numeric(interaction(RM.Anova.95CR.Psi.AR$Time,RM.Anova.95CR.Psi.AR$Variables,
+                                    RM.Anova.95CR.Psi.AR$Persons,RM.Anova.95CR.Psi.AR$id))
+
+# 95% CR: Mixed ANOVA 
+
+fit.95CR.Psi.AR = aov(
+  CR.Psi ~ Time*Persons*Variables*Model + Error(id.dat/Model),
+  data = RM.Anova.95CR.Psi.AR
+)
+
+# Summary repeated measurement Anova
+summary.anova.95CR.Psi.AR = summary(fit.95CR.Psi.AR)
+summary.anova.95CR.Psi.AR
+
+# Eta squared
+eta.MSE.95CR.AR = effectsize::eta_squared(fit.95CR.Psi.AR,ci = 0.95)
+eta.MSE.95CR.AR
+```
+
+
+#### 95% Coverage Rate for the cross-regressive effect
+
+```{r}
+#RM.Anova.95CR.Psi.CR = Performance.VAR.Psi.CR.95CR.list(N,T,P,R)
+#save(RM.Anova.95CR.Psi.CR, file = 'Results_Performance_95CR_Psi_CR_PS_VAR.RData')
+
+load(file = 'Results_Performance_95CR_Psi_CR_PS_VAR.RData')
+
+# Convert id and time into factor variables
+RM.Anova.95CR.Psi.AR <- RM.Anova.95CR.Psi.AR %>%
+  convert_as_factor(Time,Persons,Variables,Model,id)
+
+RM.Anova.95CR.Psi.AR$id.dat = as.numeric(interaction(RM.Anova.95CR.Psi.AR$Time,RM.Anova.95CR.Psi.AR$Variables,
+                                    RM.Anova.95CR.Psi.AR$Persons,RM.Anova.95CR.Psi.AR$id))
+
+# 95% CR: Mixed ANOVA 
+
+fit.95CR.Psi.AR = aov(
+  CR.Psi ~ Time*Persons*Variables*Model + Error(id.dat/Model),
+  data = RM.Anova.95CR.Psi.AR
+)
+
+# Summary repeated measurement Anova
+summary.anova.95CR.Psi.AR = summary(fit.95CR.Psi.AR)
+summary.anova.95CR.Psi.AR
+
+# Eta squared
+eta.MSE.95CR.AR = effectsize::eta_squared(fit.95CR.Psi.AR,ci = 0.95)
+eta.MSE.95CR.AR
+```
+
+#### Performance measure: MSE for the autoregressive effects 
+
+```{r}
+Performance.MSE.AR.Mean = RM.Anova.MSE.Psi.AR
+
+```
+
+#### Mean and standard deviation
+
+##### Across the number of variables
+
+```{r}
+kable(Performance.MSE.AR.Mean %>% 
+  group_by(Model,Variables) %>% 
+  summarize(mean.MSE = mean(MSE.Psi),
+            sd.MSE = sd(MSE.Psi)), digits = 3)
+```
+
+
+##### Across the number of time points
+
+```{r}
+kable(Performance.MSE.AR.Mean %>% 
+  group_by(Model,Time) %>% 
+  summarize(mean.MSE = mean(MSE.Psi),
+            sd.MSE = sd(MSE.Psi)), digits = 3)
+```
+
+##### Across the number of persons
+
+```{r}
+kable(Performance.MSE.AR.Mean %>% 
+  group_by(Model,Persons) %>% 
+  summarize(mean.MSE = mean(MSE.Psi),
+            sd.MSE = sd(MSE.Psi)), digits = 3)
+```
+
+#### Boxplots
+
+##### Across the number of variables
+
+```{r}
+Boxplot_MSE_Psi_AR_PS_VAR_Variables = ggplot(Performance.MSE.AR.Mean, aes(x=as.factor(Variables), y=MSE.Psi, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw() + 
+labs(y = "MSE autoregressive effects", x="Number of Variables")
+Boxplot_MSE_Psi_AR_PS_VAR_Variables
+
+ggsave("Boxplot_MSE_Psi_AR_PS_VAR_Variables.png", width = 6, height = 4)
+
+```
+
+##### Across the number of time points
+
+```{r}
+Boxplot_MSE_Psi_AR_PS_VAR_Time = ggplot(Performance.MSE.AR.Mean, aes(x=as.factor(Time), y=MSE.Psi, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw() + 
+labs(y = "MSE autoregressive effects", x="Number of time points")
+Boxplot_MSE_Psi_AR_PS_VAR_Time
+
+ggsave("Boxplot_MSE_Psi_AR_PS_VAR_Time.png", width = 6, height = 4)
+
+```
+
+##### Across the number of persons
+
+```{r}
+Boxplot_MSE_Psi_AR_PS_VAR_Persons = ggplot(Performance.MSE.AR.Mean, aes(x=as.factor(Persons), y=MSE.Psi, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw() + 
+labs(y = "MSE autoregressive effects", x="Number of persons")
+Boxplot_MSE_Psi_AR_PS_VAR_Persons
+
+ggsave("Boxplot_MSE_Psi_AR_PS_VAR_Persons.png", width = 6, height = 4)
+
+```
+
+#### Performance measure: MSE for the cross-regressive effects 
+
+```{r}
+Performance.MSE.CR.Mean = RM.Anova.MSE.Psi.CR
+
+```
+
+#### Mean and standard deviation
+
+##### Across the number of Variables
+
+```{r}
+kable(Performance.MSE.CR.Mean %>% 
+  group_by(Model,Variables) %>% 
+  summarize(mean.MSE = mean(MSE.Psi),
+            sd.MSE = sd(MSE.Psi)), digits = 3)
+```
+
+
+##### Across the number of time points
+
+```{r}
+kable(Performance.MSE.CR.Mean %>% 
+  group_by(Model,Time) %>% 
+  summarize(mean.MSE = mean(MSE.Psi),
+            sd.MSE = sd(MSE.Psi)), digits = 3)
+```
+
+##### Across the number of persons
+
+```{r}
+kable(Performance.MSE.CR.Mean %>% 
+  group_by(Model,Persons) %>% 
+  summarize(mean.MSE = mean(MSE.Psi),
+            sd.MSE = sd(MSE.Psi)), digits = 3)
+```
+
+#### Boxplots
+
+##### Across the number of variables
+
+```{r}
+Boxplot_MSE_Psi_CR_PS_VAR_Variables = ggplot(Performance.MSE.CR.Mean, aes(x=as.factor(Variables), y=MSE.Psi, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw() + 
+labs(y = "MSE cross-regressive effects", x="Number of variables")
+Boxplot_MSE_Psi_CR_PS_VAR_Variables
+
+ggsave("Boxplot_MSE_Psi_CR_PS_VAR_Variables.png", width = 6, height = 4)
+
+```
+
+##### Across the number of time points
+
+```{r}
+Boxplot_MSE_Psi_CR_PS_VAR_Time = ggplot(Performance.MSE.CR.Mean, aes(x=as.factor(Time), y=MSE.Psi, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw() + 
+labs(y = "MSE cross-regressive effects", x="Number of time points")
+Boxplot_MSE_Psi_CR_PS_VAR_Time
+
+ggsave("Boxplot_MSE_Psi_CR_PS_VAR_Time.png", width = 6, height = 4)
+
+```
+
+##### Across the number of persons
+
+```{r}
+Boxplot_MSE_Psi_CR_PS_VAR_Persons = ggplot(Performance.MSE.CR.Mean, aes(x=as.factor(Persons), y=MSE.Psi, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw() + 
+labs(y = "MSE cross-regressive effects", x="Number of persons")
+Boxplot_MSE_Psi_CR_PS_VAR_Persons
+
+ggsave("Boxplot_MSE_Psi_CR_PS_VAR_Persons.png", width = 6, height = 4)
+
+```
+
+
+#### Performance measure: 95% CR for the autoregressive effects 
+
+```{r}
+Performance.95CR.AR.Mean = RM.Anova.95CR.Psi.AR
+
+```
+
+#### Mean and standard deviation
+
+##### Across the number of variables
+
+```{r}
+kable(Performance.95CR.AR.Mean %>% 
+  group_by(Model,Variables) %>% 
+  summarize(mean.CR = mean(CR.Psi),
+            sd.CR = sd(CR.Psi)), digits = 3)
+```
+
+##### Across the number of time points
+
+```{r}
+kable(Performance.95CR.AR.Mean %>% 
+  group_by(Model,Time) %>% 
+  summarize(mean.CR = mean(CR.Psi),
+            sd.CR = sd(CR.Psi)), digits = 3)
+```
+
+##### Across the number of persons
+
+```{r}
+kable(Performance.95CR.AR.Mean %>% 
+  group_by(Model,Persons) %>% 
+  summarize(mean.CR = mean(CR.Psi),
+            sd.CR = sd(CR.Psi)), digits = 3)
+```
+
+#### Boxplots
+
+##### Across the number of variables
+
+```{r}
+Boxplot_95CR_Psi_AR_PS_VAR_Variables = ggplot(Performance.95CR.AR.Mean, aes(x=as.factor(Variables), y=CR.Psi, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw() + 
+labs(y = "95% Coverage rate autoregressive effects", x="Number of variables")
+Boxplot_95CR_Psi_AR_PS_VAR_Variables
+
+ggsave("Boxplot_95CR_Psi_AR_PS_VAR_Variables.png", width = 6, height = 4)
+
+```
+
+
+##### Across the number of time points
+
+```{r}
+Boxplot_95CR_Psi_AR_PS_VAR_Time = ggplot(Performance.95CR.AR.Mean, aes(x=as.factor(Time), y=CR.Psi, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw() + 
+labs(y = "95% Coverage rate autoregressive effects", x="Number of time points")
+Boxplot_95CR_Psi_AR_PS_VAR_Time
+
+ggsave("Boxplot_95CR_Psi_AR_PS_VAR_Time.png", width = 6, height = 4)
+
+```
+
+##### Across the number of persons
+
+```{r}
+Boxplot_95CR_Psi_AR_PS_VAR_Persons = ggplot(Performance.95CR.AR.Mean, aes(x=as.factor(Persons), y=CR.Psi, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw() + 
+labs(y = "95% Coverage rate autoregressive effects", x="Number of persons")
+Boxplot_95CR_Psi_AR_PS_VAR_Persons
+
+ggsave("Boxplot_95CR_Psi_AR_PS_VAR_Persons.png", width = 6, height = 4)
+
+```
+
+
+#### Performance measure: 95% CR for the cross-regressive effects 
+
+```{r}
+Performance.95CR.CR.Mean = RM.Anova.95CR.Psi.CR
+
+```
+
+#### Mean and standard deviation
+
+##### Across the number of variables
+
+```{r}
+kable(Performance.95CR.CR.Mean %>% 
+  group_by(Model,Variables) %>% 
+  summarize(mean.CR = mean(CR.Psi),
+            sd.CR = sd(CR.Psi)), digits = 3)
+```
+
+##### Across the number of time points
+
+```{r}
+kable(Performance.95CR.CR.Mean %>% 
+  group_by(Model,Time) %>% 
+  summarize(mean.CR = mean(CR.Psi),
+            sd.CR = sd(CR.Psi)), digits = 3)
+```
+
+##### Across the number of persons
+
+```{r}
+kable(Performance.95CR.CR.Mean %>% 
+  group_by(Model,Persons) %>% 
+  summarize(mean.CR = mean(CR.Psi),
+            sd.CR = sd(CR.Psi)), digits = 3)
+```
+
+#### Boxplots
+
+##### Across the number of variables
+
+```{r}
+Boxplot_95CR_Psi_CR_PS_VAR_Variables = ggplot(Performance.95CR.CR.Mean, aes(x=as.factor(Variables), y=CR.Psi, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw() + 
+labs(y = "95% Coverage rate cross-regressive effects", x="Number of variables")
+Boxplot_95CR_Psi_CR_PS_VAR_Variables
+
+ggsave("Boxplot_95CR_Psi_CR_PS_VAR_Variables.png", width = 6, height = 4)
+
+```
+
+
+##### Across the number of time points
+
+```{r}
+Boxplot_95CR_Psi_CR_PS_VAR_Time = ggplot(Performance.95CR.CR.Mean, aes(x=as.factor(Time), y=CR.Psi, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw() + 
+labs(y = "95% Coverage rate cross-regressive effects", x="Number of time points")
+Boxplot_95CR_Psi_CR_PS_VAR_Time
+
+ggsave("Boxplot_95CR_Psi_CR_PS_VAR_Time.png", width = 6, height = 4)
+
+```
+
+##### Across the number of persons
+
+```{r}
+Boxplot_95CR_Psi_CR_PS_VAR_Persons = ggplot(Performance.95CR.CR.Mean, aes(x=as.factor(Persons), y=CR.Psi, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_grey() + theme_bw() + 
+labs(y = "95% Coverage rate cross-regressive effects", x="Number of persons")
+Boxplot_95CR_Psi_CR_PS_VAR_Persons
+
+ggsave("Boxplot_95CR_Psi_CR_PS_VAR_Persons.png", width = 6, height = 4)
+
+```
