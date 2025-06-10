@@ -1,0 +1,262 @@
+---
+title: "Simulation results predictive performance simulation study III"
+authors: "Ginette Lafit"
+date: 23-02-2021
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Initial set up
+
+
+```{r definition, echo = TRUE}
+ls()
+
+rm(list=ls())
+
+library(ggplot2)
+library(gridExtra)
+library(sjstats)
+library(dplyr)
+library(knitr)
+library(rstatix)
+library(lme4)
+
+######################################################################################
+######################################################################################
+######################################################################################
+
+# Upload the functions
+source(file="Performance.Cluster.VAR.MSPE.Anova.R")
+
+######################################################################################
+######################################################################################
+######################################################################################
+
+Effect = c(1,2) # Type of effects (1=fixed) and (2=random)
+N = c(20,60) # Number of participants
+T = c(50,100,200) # Number of time points
+P = 4 # Number of variables in VAR(1) models
+K = c(2,4) # Number of clusters
+D = 1 # Difference between clusters
+S = c(1,2,3) # Distributions of persons across clusters
+
+# Set the number of replicates
+R = 100 # Number of replicates
+
+```
+
+
+## Fixed Effects 
+
+### Repeated Measurement Anova
+
+#### MSPE
+
+```{r}
+#RM.Anova.MSPE.FE = Performance.Cluster.VAR.MSPE.Anova(N,T,P,K,S,D,Effect=1,R)
+#save(RM.Anova.MSPE.FE, file = 'Results_Performance_Study_III_FE.RData')
+
+load(file = 'Results_Performance_Study_III_FE.RData')
+
+# Convert id and time into factor variables
+RM.Anova.MSPE.FE <- RM.Anova.MSPE.FE %>%
+  convert_as_factor(Time,Persons,Variables,Model,Clusters,Size,Diff,Effect,id)
+
+RM.Anova.MSPE.FE$id.dat = as.numeric(interaction(RM.Anova.MSPE.FE$Time,RM.Anova.MSPE.FE$Variables,
+                                    RM.Anova.MSPE.FE$Persons,RM.Anova.MSPE.FE$id,
+                                    RM.Anova.MSPE.FE$Clusters,RM.Anova.MSPE.FE$Effect,
+                                    RM.Anova.MSPE.FE$Diff,
+                                    RM.Anova.MSPE.FE$Size))
+```
+
+#### Anova
+
+```{r}
+# MSPE: Mixed ANOVA 
+
+fit.MSPE = aov(
+  MSPE ~ Time*Persons*Clusters*Model*Size + Error(id.dat/Model),
+  data = RM.Anova.MSPE.FE
+)
+
+# Summary repeated measurement Anova
+summary.anova.MSPE = summary(fit.MSPE)
+summary.anova.MSPE
+
+# Eta squared
+eta.MSPE = effectsize::eta_squared(fit.MSPE,ci = 0.95)
+eta.MSPE
+
+```
+
+##### Mean and standard deviation
+
+###### Across the number of time points
+
+```{r}
+kable(RM.Anova.MSPE.FE %>% 
+  group_by(Model,Size,Clusters,Persons,Time) %>% 
+  summarize(mean.MSE = mean(MSPE),
+            sd.MSE = sd(MSPE)), digits = 4)
+```
+
+##### Boxplots
+
+###### Across the number of time points
+
+```{r}
+Boxplot_MSPE_Cluster_MVAR_FE = ggplot(RM.Anova.MSPE.FE, aes(x=interaction(Time,Clusters), y=MSPE, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_brewer(palette = "Set1") + theme_bw() + 
+theme(axis.text.x = element_text(angle = 90)) +
+labs(y = "MSPE", x="Number of time points and number of clusters")
+Boxplot_MSPE_Cluster_MVAR_FE
+
+ggsave("Boxplot_MSPE_Cluster_MVAR_FE.png", width = 6, height = 4)
+
+```
+
+###### Across the number of time points selected models
+
+```{r}
+RM.Anova.MSPE.FE.Model = RM.Anova.MSPE.FE
+
+RM.Anova.MSPE.FE.Model = RM.Anova.MSPE.FE.Model[RM.Anova.MSPE.FE.Model$Model==c('MVAR.FE','MVAR.RE'),]
+
+
+Boxplot_MSPE_Cluster_MVAR_FE_Models = ggplot(RM.Anova.MSPE.FE.Model, aes(x=interaction(Time,Clusters), y=MSPE, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_brewer(palette = "Set1") + theme_bw() + 
+theme(axis.text.x = element_text(angle = 90)) +
+labs(y = "MSPE", x="Number of time points and number of clusters")
+Boxplot_MSPE_Cluster_MVAR_FE_Models
+
+ggsave("Boxplot_MSPE_Cluster_MVAR_FE_Models.png", width = 6, height = 4)
+
+```
+
+
+###### Method with the minimum MSE for each generated data set
+
+```{r}
+colMeans(table(RM.Anova.MSPE.FE %>% 
+  group_by(id.dat) %>% 
+  summarize(min.MSE = Model[which.min(MSPE)])))
+```
+
+###### Method with the minimum MSE using the one standard error rule
+
+```{r}
+colMeans(table(RM.Anova.MSPE.FE %>% 
+  group_by(id.dat) %>% 
+  summarize(min.MSE = Model[which.min(MSPE.1se)])))
+```
+
+
+## Random Effects 
+
+### Repeated Measurement Anova
+
+#### MSPE
+
+```{r}
+#RM.Anova.MSPE.RE = Performance.Cluster.VAR.MSPE.Anova(N,T,P,K,S,D,Effect=2,R)
+#save(RM.Anova.MSPE.RE, file = 'Results_Performance_Study_III_RE.RData')
+
+load(file = 'Results_Performance_Study_III_RE.RData')
+
+# Convert id and time into factor variables
+RM.Anova.MSPE.RE <- RM.Anova.MSPE.RE %>%
+  convert_as_factor(Time,Persons,Variables,Model,Clusters,Size,Diff,Effect,id)
+
+RM.Anova.MSPE.RE$id.dat = as.numeric(interaction(RM.Anova.MSPE.RE$Time,RM.Anova.MSPE.RE$Variables,
+                                    RM.Anova.MSPE.RE$Persons,RM.Anova.MSPE.RE$id,
+                                    RM.Anova.MSPE.RE$Clusters,RM.Anova.MSPE.RE$Effect,
+                                    RM.Anova.MSPE.RE$Diff,
+                                    RM.Anova.MSPE.RE$Size))
+```
+
+#### Anova
+
+```{r}
+# MSPE: Mixed ANOVA 
+
+fit.MSPE = aov(
+  MSPE ~ Time*Persons*Clusters*Model*Size + Error(id.dat/Model),
+  data = RM.Anova.MSPE.RE
+)
+
+# Summary repeated measurement Anova
+summary.anova.MSPE = summary(fit.MSPE)
+summary.anova.MSPE
+
+# Eta squared
+eta.MSPE = effectsize::eta_squared(fit.MSPE,ci = 0.95)
+eta.MSPE
+
+```
+
+##### Mean and standard deviation
+
+###### Across the number of time points
+
+```{r}
+kable(RM.Anova.MSPE.RE %>% 
+  group_by(Model,Size,Clusters,Persons,Time) %>% 
+  summarize(mean.MSE = mean(MSPE),
+            sd.MSE = sd(MSPE)), digits = 4)
+```
+
+##### Boxplots
+
+###### Across the number of time points
+
+```{r}
+Boxplot_MSPE_Cluster_MVAR_RE = ggplot(RM.Anova.MSPE.RE, aes(x=interaction(Time,Clusters), y=MSPE, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_brewer(palette = "Set1") + theme_bw() + 
+theme(axis.text.x = element_text(angle = 90)) +
+labs(y = "MSPE", x="Number of time points and number of clusters")
+Boxplot_MSPE_Cluster_MVAR_RE
+
+ggsave("Boxplot_MSPE_Cluster_MVAR_RE.png", width = 6, height = 4)
+
+```
+
+###### Across the number of time points selected models
+
+```{r}
+RM.Anova.MSPE.RE.Model = RM.Anova.MSPE.RE
+
+RM.Anova.MSPE.RE.Model = RM.Anova.MSPE.RE.Model[RM.Anova.MSPE.RE.Model$Model==c('VAR','MVAR.RE'),]
+
+
+Boxplot_MSPE_Cluster_MVAR_RE_Models = ggplot(RM.Anova.MSPE.RE.Model, aes(x=interaction(Time,Clusters), y=MSPE, fill = Model)) + 
+  geom_boxplot() + stat_summary(fun.y=mean, geom="point", shape=4, size=1) + facet_wrap(~Model) + scale_fill_brewer(palette = "Set1") + theme_bw() + 
+theme(axis.text.x = element_text(angle = 90)) +
+labs(y = "MSPE", x="Number of time points and number of clusters")
+Boxplot_MSPE_Cluster_MVAR_RE_Models
+
+ggsave("Boxplot_MSPE_Cluster_MVAR_RE_Models.png", width = 6, height = 4)
+
+```
+
+
+###### Method with the minimum MSE for each generated data set
+
+```{r}
+colMeans(table(RM.Anova.MSPE.RE %>% 
+  group_by(id.dat) %>% 
+  summarize(min.MSE = Model[which.min(MSPE)])))
+```
+
+###### Method with the minimum MSE using the one standard error rule
+
+```{r}
+colMeans(table(RM.Anova.MSPE.RE %>% 
+  group_by(id.dat) %>% 
+  summarize(min.MSE = Model[which.min(MSPE.1se)])))
+```
